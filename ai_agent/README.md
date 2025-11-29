@@ -1,0 +1,1 @@
+pip install langchain langchain-ollama pydantic requests

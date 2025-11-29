@@ -1,0 +1,7 @@
+"""Pydantic schemas for request/response validation."""
+from pydantic import BaseModel
+
+
+class HealthResponse(BaseModel):
+    """Health check response schema."""
+    status: str
