@@ -31,7 +31,7 @@ def create_app() -> FastAPI:
     app.include_router(orders.router, tags=["orders"])
     app.include_router(customers.router, tags=["customers"])
     app.include_router(addresses.router, tags=["addresses"])
-    app.include_router(animals.router, tags=["animals"])
+    app.include_router(animals.router, tags=["products"])
     app.include_router(inventories.router, tags=["inventories"])
     
     return app

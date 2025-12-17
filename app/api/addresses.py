@@ -16,7 +16,8 @@ def get_address(address_id: int, db: Session = Depends(get_db)):
     if not addr:
         raise HTTPException(status_code=404, detail="address not found")
     return AddressResponse(
-        id=addr.id,
+        
+        address_id=addr.id,
         label=addr.label,
         line1=addr.line1,
         line2=addr.line2,
@@ -41,7 +42,7 @@ def get_addresses_by_customer(customer_id: int, db: Session = Depends(get_db)):
                 customer_name = (fn + " " + ln).strip() or None
 
             out.append(AddressResponse(
-                id=addr.id,
+                address_id=addr.id,
                 label=addr.label,
                 line1=addr.line1,
                 line2=addr.line2,
@@ -67,7 +68,7 @@ def get_all_addresses(db: Session = Depends(get_db)):
             customer_name = (fn + " " + ln).strip() or None
 
         out.append(AddressResponse(
-            id=addr.id,
+            address_id=addr.id,
             label=addr.label,
             line1=addr.line1,
             line2=addr.line2,
@@ -90,7 +91,7 @@ def post_address(payload: AddressCreate, db: Session = Depends(get_db)):
 
     addr = create_address(db, data)
     return AddressResponse(
-        id=addr.id,
+        address_id=addr.id,
         label=addr.label,
         line1=addr.line1,
         line2=addr.line2,
@@ -110,7 +111,7 @@ def put_address(address_id: int, payload: AddressCreate, db: Session = Depends(g
         raise HTTPException(status_code=404, detail="address not found")
 
     return AddressResponse(
-        id=addr.id,
+        address_id=addr.id,
         label=addr.label,
         line1=addr.line1,
         line2=addr.line2,

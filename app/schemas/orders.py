@@ -5,7 +5,7 @@ from app.schemas.addresses import AddressResponse
 
 
 class OrderItemCreate(BaseModel):
-    animal_id: int = Field(..., description="ID of the animal to order")
+    product_id: int = Field(..., description="ID of the product (animal) to order")
     inventory_id: int = Field(..., description="Optional inventory item ID")
     quantity: int = Field(..., gt=0)
 
@@ -21,15 +21,15 @@ class OrderCreate(BaseModel):
 
 
 class OrderItemResponse(BaseModel):
-    id: int
-    animal_id: int
+    order_item_id: int
+    product_id: int
     quantity: int
     unit_price: float
     total_price: float
 
 
 class OrderResponse(BaseModel):
-    id: int
+    order_id: int
     order_number: str
     customer_id: int
     subtotal: float

@@ -27,7 +27,7 @@ def get_customer(customer_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=HTTPStatus.NOT_FOUND,
                             detail="customer not found")
     return CustomerResponse(
-        id=cust.id,
+        customer_id=cust.id,
         first_name=cust.first_name,
         last_name=cust.last_name,
         email=cust.email,
@@ -60,7 +60,7 @@ def get_customer_by_phone_route(phone: str, db: Session = Depends(get_db)):
                             detail="customer not found")
 
     return CustomerResponse(
-        id=cust.id,
+        customer_id=cust.id,
         first_name=cust.first_name,
         last_name=cust.last_name,
         email=cust.email,
@@ -78,7 +78,7 @@ def get_customers(limit: int = 50, offset: int = 0, db: Session = Depends(get_db
     for c in customers:
         out.append(
             CustomerResponse(
-                id=c.id,
+                customer_id=c.id,
                 first_name=c.first_name,
                 last_name=c.last_name,
                 email=c.email,
@@ -96,7 +96,7 @@ def post_customer(payload: CustomerCreate, db: Session = Depends(get_db)):
     data = payload.dict()
     cust = create_customer(db, data)
     return CustomerResponse(
-        id=cust.id,
+        customer_id=cust.id,
         first_name=cust.first_name,
         last_name=cust.last_name,
         email=cust.email,
@@ -118,7 +118,7 @@ def put_customer(customer_id: int, payload: CustomerUpdate, db: Session = Depend
         raise HTTPException(status_code=404, detail="customer not found")
 
     return CustomerResponse(
-        id=cust.id,
+        customer_id=cust.id,
         first_name=cust.first_name,
         last_name=cust.last_name,
         email=cust.email,

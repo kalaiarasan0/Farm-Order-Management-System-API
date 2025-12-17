@@ -40,7 +40,7 @@ class CustomerUpdate(CustomerBase):
 
 
 class CustomerResponse(BaseModel):
-    id: int
+    customer_id: int
     first_name: Optional[str] = None
     last_name: Optional[str] = None
     email: Optional[str] = None

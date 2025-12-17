@@ -14,7 +14,7 @@ class AddressCreate(BaseModel):
 
 
 class AddressResponse(BaseModel):
-    id: int
+    address_id: int
     label: Optional[str] = None
     line1: str
     line2: Optional[str] = None

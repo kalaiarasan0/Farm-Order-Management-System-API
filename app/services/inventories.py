@@ -49,8 +49,8 @@ def create_inventory(db: Session, data: dict) -> Inventory:
 def get_inventory_by_id(db: Session, inventory_id: int) -> Optional[Inventory]:
     return db.get(Inventory, inventory_id)
 
-def get_inventory_by_animal_id(db: Session, animal_id: int) -> Optional[Inventory]:
-    return db.query(Inventory).filter(Inventory.animal_id == animal_id).all()
+def get_inventory_by_product_id(db: Session, product_id: int) -> Optional[Inventory]:
+    return db.query(Inventory).options(joinedload(Inventory.animal)).filter(Inventory.animal_id == product_id).all()
 
 def list_inventories(db: Session, limit: int = 50, offset: int = 0) -> list[Inventory]:
     return db.query(Inventory).options(joinedload(Inventory.animal)).order_by(Inventory.id.desc()).limit(limit).offset(offset).all()

@@ -2,7 +2,7 @@ from pydantic import BaseModel
 from typing import Optional
 from datetime import datetime
 
-class AnimalCreate(BaseModel):
+class ProductCreate(BaseModel):
     sku: str
     species: str
     name: Optional[str] = None
@@ -10,8 +10,8 @@ class AnimalCreate(BaseModel):
     base_price: float
     specs: Optional[str] = None
 
-class AnimalResponse(BaseModel):
-    id: int
+class ProductResponse(BaseModel):
+    product_id: int
     sku: str
     species: str
     name: Optional[str] = None

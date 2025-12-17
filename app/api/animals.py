@@ -1,22 +1,22 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.db import get_db
-from app.schemas.animals import AnimalCreate, AnimalResponse
+from app.schemas.animals import ProductCreate, ProductResponse
 from app.services.animals import create_animal, get_animal_by_id, get_animal_by_name, list_animals
 
-router = APIRouter(prefix="/api/v1/animals", tags=["animals"])
+router = APIRouter(prefix="/api/v1/products", tags=["products"])
 
 
-@router.post("/create", response_model=AnimalResponse)
-def create_animal_endpoint(payload: AnimalCreate, db: Session = Depends(get_db)):
+@router.post("/create", response_model=ProductResponse)
+def create_animal_endpoint(payload: ProductCreate, db: Session = Depends(get_db)):
     """Create a new animal entry."""
     try:
         animal = create_animal(db, payload.dict())
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
 
-    return AnimalResponse(
-        id=animal.id,
+    return ProductResponse(
+        product_id=animal.id,
         sku=animal.sku,
         name=animal.name,
         species=animal.species,
@@ -27,16 +27,16 @@ def create_animal_endpoint(payload: AnimalCreate, db: Session = Depends(get_db))
     )
 
 
-@router.get("/id/{animal_id}", response_model=AnimalResponse)
-def get_animal_by_id_endpoint(animal_id: int, db: Session = Depends(get_db)):
+@router.get("/id/{product_id}", response_model=ProductResponse)
+def get_animal_by_id_endpoint(product_id: int, db: Session = Depends(get_db)):
     """Get animal by ID."""
 
-    animal = get_animal_by_id(db, animal_id)
+    animal = get_animal_by_id(db, product_id)
     if not animal:
         raise HTTPException(status_code=404, detail="animal not found")
 
-    return AnimalResponse(
-        id=animal.id,
+    return ProductResponse(
+        product_id=animal.id,
         sku=animal.sku,
         name=animal.name,
         species=animal.species,
@@ -47,7 +47,7 @@ def get_animal_by_id_endpoint(animal_id: int, db: Session = Depends(get_db)):
     )
 
 
-@router.get("/name-search/{name}", response_model=list[AnimalResponse])
+@router.get("/name-search/{name}", response_model=list[ProductResponse])
 def get_animal_by_name_endpoint(name: str, db: Session = Depends(get_db)):
     """Get animal by name search."""
     animal = get_animal_by_name(db, name)
@@ -55,8 +55,8 @@ def get_animal_by_name_endpoint(name: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="animal not found")
     out = []
     for ani in animal:
-        out.append(AnimalResponse(
-            id=ani.id,
+        out.append(ProductResponse(
+            product_id=ani.id,
             sku=ani.sku,
             name=ani.name,
             species=ani.species,
@@ -68,14 +68,14 @@ def get_animal_by_name_endpoint(name: str, db: Session = Depends(get_db)):
     return out
 
 
-@router.get("/list", response_model=list[AnimalResponse])
+@router.get("/list", response_model=list[ProductResponse])
 def list_animals_endpoint(db: Session = Depends(get_db)):
     """List all animals."""
     animals = list_animals(db)
     out = []
     for ani in animals:
-        out.append(AnimalResponse(
-            id=ani.id,
+        out.append(ProductResponse(
+            product_id=ani.id,
             sku=ani.sku,
             name=ani.name,
             species=ani.species,

@@ -21,11 +21,18 @@ def place_order(payload: OrderCreate, db: Session = Depends(get_db)):
         if not customer_id and not customer_data:
             raise HTTPException(status_code=400, detail="customer_id or customer data is required")
 
+        # MAP ITEMS: product_id -> product_id
+        items_data = []
+        for item in payload.items:
+             i_dict = item.dict()
+             i_dict['product_id'] = i_dict.pop('product_id')
+             items_data.append(i_dict)
+
         order = create_order(
             db,
             customer_id=customer_id,
             customer_data=customer_data,
-            items=[item.dict() for item in payload.items],
+            items=items_data,
             shipping=payload.shipping or 0.0,
             tax=payload.tax or 0.0,
         )
@@ -38,8 +45,8 @@ def place_order(payload: OrderCreate, db: Session = Depends(get_db)):
     for it in order.items:
         items.append(
             {
-                "id": it.id,
-                "animal_id": it.animal_id,
+                "order_item_id": it.id,
+                "product_id": it.product_id,
                 "quantity": it.quantity,
                 "unit_price": float(it.unit_price),
                 "total_price": float(it.total_price),
@@ -47,7 +54,7 @@ def place_order(payload: OrderCreate, db: Session = Depends(get_db)):
         )
 
     return {
-        "id": order.id,
+        "order_id": order.id,
         "order_number": order.order_number,
         "customer_id": order.customer_id,
         "subtotal": float(order.subtotal),
@@ -70,8 +77,8 @@ def get_orders(limit: int = 50, offset: int = 0, db: Session = Depends(get_db)):
         for it in order.items:
             items.append(
                 {
-                    "id": it.id,
-                    "animal_id": it.animal_id,
+                    "order_item_id": it.id,
+                    "product_id": it.product_id,
                     "quantity": it.quantity,
                     "unit_price": float(it.unit_price),
                     "total_price": float(it.total_price),
@@ -83,7 +90,7 @@ def get_orders(limit: int = 50, offset: int = 0, db: Session = Depends(get_db)):
         if getattr(order, "customer", None):
             c = order.customer
             customer = {
-                "id": c.id,
+                "customer_id": c.id,
                 "first_name": c.first_name,
                 "last_name": c.last_name,
                 "email": c.email,
@@ -97,7 +104,7 @@ def get_orders(limit: int = 50, offset: int = 0, db: Session = Depends(get_db)):
             addr = db.get(Address, order.billing_address_id)
             if addr:
                 billing = {
-                    "id": addr.id,
+                    "address_id": addr.id,
                     "label": addr.label,
                     "line1": addr.line1,
                     "line2": addr.line2,
@@ -112,7 +119,7 @@ def get_orders(limit: int = 50, offset: int = 0, db: Session = Depends(get_db)):
             addr = db.get(Address, order.shipping_address_id)
             if addr:
                 shipping = {
-                    "id": addr.id,
+                    "address_id": addr.id,
                     "label": addr.label,
                     "line1": addr.line1,
                     "line2": addr.line2,
@@ -124,7 +131,7 @@ def get_orders(limit: int = 50, offset: int = 0, db: Session = Depends(get_db)):
 
         results.append(
             {
-                "id": order.id,
+                "order_id": order.id,
                 "order_number": order.order_number,
                 "customer_id": order.customer_id,
                 "subtotal": float(order.subtotal),
@@ -152,8 +159,8 @@ def get_order(order_id: int, db: Session = Depends(get_db)):
     for it in order.items:
         items.append(
             {
-                "id": it.id,
-                "animal_id": it.animal_id,
+                "order_item_id": it.id,
+                "product_id": it.product_id,
                 "quantity": it.quantity,
                 "unit_price": float(it.unit_price),
                 "total_price": float(it.total_price),
@@ -165,7 +172,7 @@ def get_order(order_id: int, db: Session = Depends(get_db)):
     if getattr(order, "customer", None):
         c = order.customer
         customer = {
-            "id": c.id,
+            "customer_id": c.id,
             "first_name": c.first_name,
             "last_name": c.last_name,
             "email": c.email,
@@ -179,7 +186,7 @@ def get_order(order_id: int, db: Session = Depends(get_db)):
         addr = db.get(Address, order.billing_address_id)
         if addr:
             billing = {
-                "id": addr.id,
+                "address_id": addr.id,
                 "label": addr.label,
                 "line1": addr.line1,
                 "line2": addr.line2,
@@ -194,7 +201,7 @@ def get_order(order_id: int, db: Session = Depends(get_db)):
         addr = db.get(Address, order.shipping_address_id)
         if addr:
             shipping = {
-                "id": addr.id,
+                "address_id": addr.id,
                 "label": addr.label,
                 "line1": addr.line1,
                 "line2": addr.line2,
@@ -205,7 +212,7 @@ def get_order(order_id: int, db: Session = Depends(get_db)):
             }
 
     return {
-        "id": order.id,
+        "order_id": order.id,
         "order_number": order.order_number,
         "customer_id": order.customer_id,
         "subtotal": float(order.subtotal),

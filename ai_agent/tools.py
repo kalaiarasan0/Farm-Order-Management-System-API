@@ -4,26 +4,62 @@
 
 from langchain_core.tools import tool
 import requests
+import json
 
 API_BASE_URL = "http://127.0.0.1:8000"
 
 @tool
-def create_farm_order(product_id: int | str, quantity: int, inventory_id: int | str, customer_id: int | str = None, customer_name: str = None) -> str:
+def verify_order_details(product_id: int, inventory_id: int, customer_id: int) -> str:
     """
-    Use this tool to place an order.
-    You MUST provide `product_id`, `inventory_id`, and `quantity`.
-    `product_id` (animal_id) and `inventory_id` MUST be integers.
-    Use `search_inventory_stock_list` to find BOTH the `product_id` and `inventory_id`.
-    You SHOULD provide `customer_id` if known.
-    If `customer_id` is NOT known, you can provide `customer_name`, but it is better to search for the customer first.
+    Use this tool to VERIFY the order details BEFORE placing it.
+    You MUST provide `product_id`, `inventory_id`, and `customer_id` (all integers).
+    Returns a `verification_token` required for `submit_final_order`.
+    """
+    if not (str(product_id).isdigit() and str(inventory_id).isdigit() and str(customer_id).isdigit()):
+         return "Error: IDs must be valid integers."
+
+    # 1. Verify Inventory Existence
+    try:
+        # Re-use the logic from get_inventory (or call the API directly)
+        endpoint = f"{API_BASE_URL}/api/v1/inventories/product/{product_id}"
+        response = requests.get(endpoint)
+        
+        # Check for 404 explicitly
+        if response.status_code == 404:
+            return f"Verification Failed: No inventory found for product_id {product_id}. Cannot generate token."
+            
+        response.raise_for_status()
+        inventories = response.json()
+        
+        if not inventories:
+             return f"Verification Failed: Inventory list is empty for product_id {product_id}. Cannot generate token."
+
+        # 2. Check if the specific inventory_id exists in the list
+        # Convert IDs to int for comparison
+        target_inv_id = int(inventory_id)
+        valid_ids = [int(item['inventory_id']) for item in inventories]
+        
+        if target_inv_id not in valid_ids:
+             return f"Verification Failed: Inventory ID {target_inv_id} does not exist for Product ID {product_id}. Valid Inventory IDs: {valid_ids}"
+
+    except requests.exceptions.RequestException as e:
+        return f"Verification Error accessing API: {e}"
+    
+    # 3. Generate Token if Valid
+    token = f"ver_{product_id}_{customer_id}_{inventory_id}_secure"
+    return json.dumps({"status": "verified", "verification_token": token, "message": "Verification valid. You may now call submit_final_order."})
+
+@tool
+def submit_final_order(product_id: int, quantity: int, inventory_id: int, customer_id: int, verification_token: str) -> str:
+    """
+    Use this tool to place the FINAL order.
+    Requirements:
+    1. `product_id`, `inventory_id`, `customer_id` MUST be integers.
+    2. `verification_token` MUST be obtained from `verify_order_details`.
     """
     try:
-        # 0. Validate inputs are integers
-        if not str(product_id).isdigit() or not str(inventory_id).isdigit():
-            return "ERROR: You provided a NAME (string) for `product_id` or `inventory_id`. You MUST use integer IDs. \n1. Call `search_products` to find the `product_id`.\n2. Call `get_inventory_by_animal_id` with that `product_id` to find the `inventory_id`.\n3. Then call this tool again with the integers."
-
-        if customer_id and not str(customer_id).isdigit():
-             return "ERROR: You provided a NAME for `customer_id`. Call `search_customers` to find the integer ID first."
+        if not verification_token or not verification_token.startswith("ver_"):
+            return "Error: Invalid or missing `verification_token`. You MUST call `verify_order_details` first to get a token."
 
         # 1. Define the API endpoint
         endpoint = f"{API_BASE_URL}/api/v1/orders/place-order"
@@ -35,6 +71,7 @@ def create_farm_order(product_id: int | str, quantity: int, inventory_id: int | 
         # }
         
         payload = {
+            "customer_id": int(customer_id),
             "items": [
                 {
                     "animal_id": int(product_id),
@@ -43,14 +80,7 @@ def create_farm_order(product_id: int | str, quantity: int, inventory_id: int | 
                 }
             ]
         }
-        
-        if customer_id:
-            payload["customer_id"] = int(customer_id)
-        elif customer_name:
-            # If we only have a name, we return an error asking to search for ID.
-            return "Error: Please find the 'customer_id' using 'search_customers' tool before placing an order."
-        else:
-             return "Error: 'customer_id' is required."
+
 
         # 3. Make the REST API call (POST request)
         response = requests.post(endpoint, json=payload)
@@ -69,42 +99,32 @@ def create_farm_order(product_id: int | str, quantity: int, inventory_id: int | 
 @tool
 def search_products(query: str) -> str:
     """
-    Use this tool to find products (animals) based on a search query.
+    Use this tool to find products based on a search query.
     Useful when the user asks for something vague like "milk goats" or "large animals".
     It searches name, species, and description.
     """
     try:
-        # 1. Fetch all animals
-        endpoint = f"{API_BASE_URL}/api/v1/animals/list"
+        # 1. Fetch all products
+        endpoint = f"{API_BASE_URL}/api/v1/products/list"
         response = requests.get(endpoint)
         response.raise_for_status()
-        animals = response.json()
-        
-        if not animals:
-            return "No products found in the catalog."
-            
+        products = response.json()
+                    
         # 2. Perform simple client-side search
-        query = query.lower()
+        query = query.lower().strip()
         matches = []
         
-        for animal in animals:
-            # Search in name, species, and description
-            text_to_search = f"{animal['name']} {animal['species']} {animal.get('description', '')}".lower()
-            
-            if query in text_to_search:
-                matches.append(animal)
+        if query == "all" or query == "":
+            matches = products
+        else:
+            for product in products:
+                # Search in name, species, and description
+                text_to_search = f"{product['name']} {product['species']} {product.get('description', '')}".lower()
+                
+                if query in text_to_search:
+                    matches.append(product)
         
-        if not matches:
-            return f"No products found matching '{query}'."
-            
-        # 3. Format results
-        formatted_results = []
-        for item in matches[:5]: # Limit to top 5
-            formatted_results.append(
-                f"ID: {item['id']} | Name: {item['name']} | Species: {item['species']} | Price: ${item['base_price']} | Desc: {item.get('description', 'N/A')}"
-            )
-            
-        return "\n".join(formatted_results)
+        return json.dumps(matches)  
 
     except requests.exceptions.RequestException as e:
         return f"Error searching products: {e}"
@@ -122,9 +142,6 @@ def search_customers(query: str) -> str:
         response.raise_for_status()
         customers = response.json()
         
-        if not customers:
-            return "No customers found."
-            
         # 2. Client-side search
         query = query.lower()
         matches = []
@@ -135,26 +152,18 @@ def search_customers(query: str) -> str:
                 matches.append(cust)
         
         if not matches:
-            return f"No customers found matching '{query}'."
-            
-        # 3. Format results
-        formatted_results = []
-        for item in matches[:5]:
-            formatted_results.append(
-                f"ID: {item['id']} | Name: {item['first_name']} {item['last_name']} | Email: {item['email']} | Phone: {item['phone']}"
-            )
-            
-        return "\n".join(formatted_results)
+            return "No customers found matching the query."
+        
+        return json.dumps(matches)    
 
     except requests.exceptions.RequestException as e:
-        return f"Error searching customers: {e}"
-
+        return "Error searching customers: " + str(e)
 
 @tool
-def search_inventory_stock_list(query: str) -> str:
+def search_inventory_stock() -> str:
     """
-    Use this tool to find a inventory stock.
-    Useful when you need to find `inventory_id` and `animal_id` (product_id) for an order.
+    Use this tool to find a inventory stock available.
+    Useful when you need to find all inventory stock available.
     """
     try:
         # 1. Fetch all customers
@@ -163,66 +172,89 @@ def search_inventory_stock_list(query: str) -> str:
         response.raise_for_status()
         inventories = response.json()
         
-        if not inventories:
-            return "No inventories found."
-            
-        # 2. Client-side search
-        query = query.lower()
-        matches = []
-        
-        for inventory in inventories:
-            # Handle potential None for animal
-            animal_name = inventory['animal']['name'] if inventory.get('animal') else "Unknown"
-            text_to_search = f"{inventory['id']} {inventory['animal_id']} {inventory['quantity']} {inventory['unit_price']} {inventory['location']} {inventory['status']} {animal_name}".lower()
-            if query in text_to_search:
-                matches.append(inventory)
-        
-        if not matches:
-            return f"No inventory stock found matching '{query}'."
-            
-        # 3. Format results
-        formatted_results = []
-        for item in matches[:5]:
-            animal_name = item['animal']['name'] if item.get('animal') else "Unknown"
-            formatted_results.append(
-                f"Inventory ID: {item['id']} | Animal ID: {item['animal_id']} | Quantity: {item['quantity']} | Unit Price: {item['unit_price']} | Location: {item['location']} | Status: {item['status']} | Animal Name: {animal_name}"
-            )
-            
-        return "\n".join(formatted_results)
+        return json.dumps(inventories)
 
     except requests.exceptions.RequestException as e:
         return f"Error searching Stock Inventory: {e}"
 
 @tool
-def get_inventory_by_animal_id(animal_id: int) -> str:
+def search_inventory_stock_list(query: str) -> str:
     """
-    Use this tool to find inventory items for a specific animal ID.
-    Useful when you have the `animal_id` (product_id) and need the `inventory_id`.
+    Use this tool to find a inventory stock.
+    Useful when you need to find `inventory_id` and `product_id` for an order.
     """
     try:
-        endpoint = f"{API_BASE_URL}/api/v1/inventories/animal-id/{animal_id}"
+        # 1. Fetch all customers
+        endpoint = f"{API_BASE_URL}/api/v1/inventories/list"
         response = requests.get(endpoint)
         response.raise_for_status()
         inventories = response.json()
         
-        if not inventories:
-            return f"No inventory found for animal ID {animal_id}."
-            
-        formatted_results = []
-        for item in inventories:
-            formatted_results.append(
-                f"Inventory ID: {item['id']} | Animal ID: {item['animal_id']} | Quantity: {item['quantity']} | Unit Price: {item['unit_price']} | Location: {item['location']} | Status: {item['status']}"
-            )
-            
-        return "\n".join(formatted_results)
+        # 2. Client-side search
+        query = query.lower().strip()
+        matches = []
+        
+        if query == "all" or query == "":
+             matches = inventories
+        else:
+            for inventory in inventories:
+                # Handle potential None for animal
+                animal_name = inventory.get('animal', {}).get('name', "Unknown") if inventory.get('animal') else "Unknown"
+                # NOTE: API now returns `product_id`, so we check that first.
+                prod_id = inventory.get('product_id', '')
+                text_to_search = f"{inventory.get('id', '')} {prod_id} {inventory.get('quantity', '')} {inventory.get('unit_price', '')} {inventory.get('location', '')} {inventory.get('status', '')} {animal_name}".lower()
+                if query in text_to_search:
+                    matches.append(inventory)
+        
+        if not matches:
+            return "No inventories found matching the query."
+
+        return json.dumps(matches)
 
     except requests.exceptions.RequestException as e:
-        return f"Error fetching inventory by animal ID: {e}"
+        return f"Error searching Stock Inventory: {e}"
+
+@tool
+def check_inventory_for_product(product_id: int) -> str:
+    """
+    Use this tool to find inventory items for a specific Product ID.
+    Useful when you have the `product_id` and need the `inventory_id`.
+    """
+    try:
+        # Update endpoint to new route
+        endpoint = f"{API_BASE_URL}/api/v1/inventories/product/{product_id}"
+        response = requests.get(endpoint)
+        
+        if response.status_code == 404:
+             return "No inventory found for this product_id."
+
+        response.raise_for_status()
+        inventories = response.json()
+        
+        if not inventories:
+            return "No inventory found for this product_id."
+            
+        return json.dumps(inventories)
+
+    except requests.exceptions.RequestException as e:
+        if e.response is not None and e.response.status_code == 404:
+            return "No inventory found for this product_id."
+        return f"Error searching inventory for product_id: {e}"
 
 
 if __name__ == "__main__":
-    print("--- Testing search_products ---")
-    print(search_products("goat"))
-    print("\n--- Testing search_customers ---")
-    # Assuming there are customers, otherwise this might return "No customers found"
-    print(search_customers("kalai")) 
+    # print("--- Testing search_products ---")
+    # print(search_products.invoke("sheep")) # Use invoke for tools
+
+    # # Assuming there are customers, otherwise this might return "No customers found"
+    # print("\n--- Testing search_customers ---")
+    # print(search_customers.invoke("kalaiprrethi"))
+
+    print("--- Testing search_inventory_stock ---")
+    print(search_inventory_stock.invoke(""))
+
+    # print("--- Testing search_inventory_stock_list ---")
+    # print(search_inventory_stock_list.invoke("available stock"))
+
+    # print("--- Testing check_inventory_for_product ---")
+    # print(check_inventory_for_product.invoke("1231"))
