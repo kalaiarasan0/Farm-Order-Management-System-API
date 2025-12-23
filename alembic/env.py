@@ -1,10 +1,7 @@
 import sys
 import logging
-
 from logging.config import fileConfig
 
-from sqlalchemy import engine_from_config
-from sqlalchemy import pool
 
 from alembic import context
 
@@ -25,10 +22,14 @@ except Exception:
 logger = logging.getLogger("alembic.env")
 
 # Import project models and settings
-from app.models import Base  # noqa: E402
+from app.models import Base, TrackingBase  # noqa: E402
 from app.config import settings  # noqa: E402
 
-target_metadata = Base.metadata
+# Map specific databases to their metadata
+target_metadata = {
+    "default": Base.metadata,
+    "tracking": TrackingBase.metadata,
+}
 
 
 def run_migrations_offline() -> None:
@@ -39,16 +40,28 @@ def run_migrations_offline() -> None:
     here as well.  By skipping the Engine creation
     we don't even need a DBAPI to be available.
     """
-    url = settings.DATABASE_URL
-    context.configure(
-        url=url,
-        target_metadata=target_metadata,
-        literal_binds=True,
-        dialect_opts={"paramstyle": "named"},
-    )
+    # For offline mode, we might need to run for each DB explicitly or just default.
+    # A simple approach for multi-db offline is iterating known DBs.
 
-    with context.begin_transaction():
-        context.run_migrations()
+    # Database URLs
+    db_urls = {
+        "default": settings.DATABASE_URL,
+        "tracking": settings.TRACKING_DATABASE_URL,
+    }
+
+    for name, url in db_urls.items():
+        context.configure(
+            url=url,
+            target_metadata=target_metadata.get(name),
+            literal_binds=True,
+            dialect_opts={"paramstyle": "named"},
+            render_as_batch=False,
+            # Use distinct upgrade functions or branches if we had them,
+            # but here we just distinguish by name
+        )
+
+        with context.begin_transaction():
+            context.run_migrations(engine_name=name)
 
 
 def run_migrations_online() -> None:
@@ -57,25 +70,30 @@ def run_migrations_online() -> None:
     In this scenario we need to create an Engine and associate a connection
     with the context.
     """
-    configuration = config.get_section(config.config_ini_section) or {}
-    configuration["sqlalchemy.url"] = settings.DATABASE_URL
 
-    connectable = engine_from_config(
-        configuration,
-        prefix="sqlalchemy.",
-        poolclass=pool.NullPool,
-    )
+    # We can import engines directly from app.db to ensure we use the same config
+    from app.db import engine as run_engine, tracking_engine
 
-    with connectable.connect() as connection:
-        context.configure(
-            connection=connection,
-            target_metadata=target_metadata,
-            compare_type=True,
-            render_as_batch=False,
-        )
+    engines = {
+        "default": run_engine,
+        "tracking": tracking_engine,
+    }
 
-        with context.begin_transaction():
-            context.run_migrations()
+    for name, engine in engines.items():
+        logger.info(f"Migrating database: {name}")
+
+        with engine.connect() as connection:
+            context.configure(
+                connection=connection,
+                target_metadata=target_metadata.get(name),
+                compare_type=True,
+                render_as_batch=False,
+                upgrade_token=f"{name}_upgrades",
+                downgrade_token=f"{name}_downgrades",
+            )
+
+            with context.begin_transaction():
+                context.run_migrations(engine_name=name)
 
 
 if context.is_offline_mode():

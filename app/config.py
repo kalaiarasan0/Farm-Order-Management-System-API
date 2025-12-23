@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     
     # Database
     DATABASE_URL: str = "mysql+pymysql://root:@127.0.0.1:3306/farmai?charset=utf8mb4"
+    TRACKING_DATABASE_URL: str = "mysql+pymysql://root:@127.0.0.1:3306/farmai_tracking?charset=utf8mb4"
     
     # Server
     # Bind only to localhost for local-only access

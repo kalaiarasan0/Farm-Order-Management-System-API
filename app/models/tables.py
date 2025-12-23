@@ -32,9 +32,13 @@ class Animal(Base):
     description = Column(Text)
     base_price = Column(DECIMAL(10, 2), nullable=False)
     specs = Column(JSON, nullable=True)
-    created_at = Column(TIMESTAMP, nullable=False, server_default=text('CURRENT_TIMESTAMP'))
+    created_at = Column(
+        TIMESTAMP, nullable=False, server_default=text("CURRENT_TIMESTAMP")
+    )
     updated_at = Column(
-        TIMESTAMP, nullable=True, server_default=text('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP')
+        TIMESTAMP,
+        nullable=True,
+        server_default=text("CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"),
     )
 
 
@@ -53,9 +57,13 @@ class Inventory(Base):
     location = Column(String(128), nullable=True)
     status = Column(String(32), nullable=False, default="available")
     specs = Column(JSON, nullable=True)
-    created_at = Column(TIMESTAMP, nullable=False, server_default=text('CURRENT_TIMESTAMP'))
+    created_at = Column(
+        TIMESTAMP, nullable=False, server_default=text("CURRENT_TIMESTAMP")
+    )
     updated_at = Column(
-        TIMESTAMP, nullable=True, server_default=text('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP')
+        TIMESTAMP,
+        nullable=True,
+        server_default=text("CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"),
     )
 
     animal = relationship("Animal", backref="inventory_items")
@@ -74,9 +82,13 @@ class Customer(Base):
     last_name = Column(String(100))
     email = Column(String(255), unique=True, index=True, nullable=False)
     phone = Column(String(50), unique=True, index=True, nullable=False)
-    created_at = Column(TIMESTAMP, nullable=False, server_default=text('CURRENT_TIMESTAMP'))
+    created_at = Column(
+        TIMESTAMP, nullable=False, server_default=text("CURRENT_TIMESTAMP")
+    )
     updated_at = Column(
-        TIMESTAMP, nullable=True, server_default="CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"
+        TIMESTAMP,
+        nullable=True,
+        server_default="CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP",
     )
 
 
@@ -99,7 +111,9 @@ class Address(Base):
     country = Column(String(100), default="", nullable=False)
     created_at = Column(TIMESTAMP, nullable=False, server_default="CURRENT_TIMESTAMP")
     updated_at = Column(
-        TIMESTAMP, nullable=True, server_default="CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"
+        TIMESTAMP,
+        nullable=True,
+        server_default="CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP",
     )
     customer = relationship("Customer", backref="addresses")
 
@@ -122,13 +136,19 @@ class Order(Base):
     tax = Column(DECIMAL(10, 2), default=0)
     total = Column(DECIMAL(10, 2), nullable=False)
     order_status = Column(String(32), nullable=False, default="pending")
-    placed_at = Column(TIMESTAMP, nullable=False, server_default=text('CURRENT_TIMESTAMP'))
+    placed_at = Column(
+        TIMESTAMP, nullable=False, server_default=text("CURRENT_TIMESTAMP")
+    )
     updated_at = Column(
-        TIMESTAMP, nullable=True, server_default=text('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP')
+        TIMESTAMP,
+        nullable=True,
+        server_default=text("CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"),
     )
 
     customer = relationship("Customer", backref="orders")
-    items = relationship("OrderItem", back_populates="order", cascade="all, delete-orphan")
+    items = relationship(
+        "OrderItem", back_populates="order", cascade="all, delete-orphan"
+    )
 
 
 class OrderItem(Base):
@@ -140,7 +160,9 @@ class OrderItem(Base):
     }
 
     id = Column(BigInteger, primary_key=True, autoincrement=True)
-    order_id = Column(BigInteger, ForeignKey("orders.id", ondelete="CASCADE"), nullable=False)
+    order_id = Column(
+        BigInteger, ForeignKey("orders.id", ondelete="CASCADE"), nullable=False
+    )
     animal_id = Column(Integer, ForeignKey("animals.id"), nullable=False)
     inventory_id = Column(BigInteger, ForeignKey("inventory.id"), nullable=True)
     quantity = Column(Integer, nullable=False, default=1)
@@ -168,9 +190,13 @@ class Delivery(Base):
     tracking_number = Column(String(128), nullable=True)
     status = Column(String(32), default="scheduled")
     notes = Column(Text)
-    created_at = Column(TIMESTAMP, nullable=False, server_default=text('CURRENT_TIMESTAMP'))
+    created_at = Column(
+        TIMESTAMP, nullable=False, server_default=text("CURRENT_TIMESTAMP")
+    )
     updated_at = Column(
-        TIMESTAMP, nullable=True, server_default="CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"
+        TIMESTAMP,
+        nullable=True,
+        server_default="CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP",
     )
 
     order = relationship("Order")
@@ -191,9 +217,34 @@ class Payment(Base):
     method = Column(String(50), nullable=True)
     status = Column(String(32), default="pending")
     reference = Column(String(255), nullable=True)
-    created_at = Column(TIMESTAMP, nullable=False, server_default=text('CURRENT_TIMESTAMP'))
+    created_at = Column(
+        TIMESTAMP, nullable=False, server_default=text("CURRENT_TIMESTAMP")
+    )
     updated_at = Column(
-        TIMESTAMP, nullable=True, server_default="CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"
+        TIMESTAMP,
+        nullable=True,
+        server_default="CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP",
     )
 
     order = relationship("Order")
+
+
+class OrderVerificationToken(Base):
+    __tablename__ = "order_verification_tokens"
+    __table_args__ = {
+        "mysql_engine": "InnoDB",
+        "mysql_charset": "utf8mb4",
+        "mysql_collate": "utf8mb4_unicode_ci",
+    }
+
+    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    token = Column(String(64), unique=True, nullable=False)
+    customer_id = Column(Integer, ForeignKey("customers.id"), nullable=False)
+    product_id = Column(Integer, ForeignKey("animals.id"), nullable=False)
+    quantity = Column(Integer, nullable=False)
+    created_at = Column(
+        TIMESTAMP, nullable=False, server_default=text("CURRENT_TIMESTAMP")
+    )
+
+    customer = relationship("Customer")
+    animal = relationship("Animal")

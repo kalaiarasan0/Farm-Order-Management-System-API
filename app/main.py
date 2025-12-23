@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.api import health, orders, customers, addresses, animals, inventories
+from app.api import health, orders, customers, addresses, animals, inventories, ai_work
 
 def create_app() -> FastAPI:
     """Create and configure FastAPI application."""
@@ -33,6 +33,7 @@ def create_app() -> FastAPI:
     app.include_router(addresses.router, tags=["addresses"])
     app.include_router(animals.router, tags=["products"])
     app.include_router(inventories.router, tags=["inventories"])
+    app.include_router(ai_work.router, tags=["ai_work"])
     
     return app
 

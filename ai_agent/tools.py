@@ -8,93 +8,84 @@ import json
 
 API_BASE_URL = "http://127.0.0.1:8000"
 
+
 @tool
-def verify_order_details(product_id: int, inventory_id: int, customer_id: int) -> str:
+def create_token_order(product_id: int, customer_id: int, quantity: int) -> str:
     """
-    Use this tool to VERIFY the order details BEFORE placing it.
-    You MUST provide `product_id`, `inventory_id`, and `customer_id` (all integers).
-    Returns a `verification_token` required for `submit_final_order`.
+    Use this tool to VERIFY order details and GENERATE a token.
+    Call this BEFORE placing an order.
+    Returns: A `verification_token` and status message.
     """
-    if not (str(product_id).isdigit() and str(inventory_id).isdigit() and str(customer_id).isdigit()):
-         return "Error: IDs must be valid integers."
+    if not (
+        str(product_id).isdigit()
+        and str(customer_id).isdigit()
+        and str(quantity).isdigit()
+    ):
+        return "Error: IDs and quantity must be valid integers."
 
-    # 1. Verify Inventory Existence
     try:
-        # Re-use the logic from get_inventory (or call the API directly)
-        endpoint = f"{API_BASE_URL}/api/v1/inventories/product/{product_id}"
-        response = requests.get(endpoint)
-        
-        # Check for 404 explicitly
-        if response.status_code == 404:
-            return f"Verification Failed: No inventory found for product_id {product_id}. Cannot generate token."
-            
-        response.raise_for_status()
-        inventories = response.json()
-        
-        if not inventories:
-             return f"Verification Failed: Inventory list is empty for product_id {product_id}. Cannot generate token."
+        endpoint = f"{API_BASE_URL}/api/v1/ai_work/create_token_order"
+        payload = {
+            "product_id": int(product_id),
+            "customer_id": int(customer_id),
+            "quantity": int(quantity),
+        }
 
-        # 2. Check if the specific inventory_id exists in the list
-        # Convert IDs to int for comparison
-        target_inv_id = int(inventory_id)
-        valid_ids = [int(item['inventory_id']) for item in inventories]
-        
-        if target_inv_id not in valid_ids:
-             return f"Verification Failed: Inventory ID {target_inv_id} does not exist for Product ID {product_id}. Valid Inventory IDs: {valid_ids}"
+        response = requests.post(endpoint, json=payload)
+
+        # We might get 200 OK with "status": "error" or 4xx/5xx
+        if response.status_code != 200:
+            return f"Error connecting to API: {response.text}"
+
+        result = response.json()
+
+        if result.get("status") == "error":
+            return f"Verification Failed: {result.get('message')}"
+
+        token = result.get("verification_token")
+        if not token:
+            return "Error: Verification succeeded but no token returned."
+
+        return json.dumps(
+            {
+                "status": "verified",
+                "verification_token": token,
+                "message": "Token generated successfully. Use this token to place the order.",
+            }
+        )
 
     except requests.exceptions.RequestException as e:
         return f"Verification Error accessing API: {e}"
-    
-    # 3. Generate Token if Valid
-    token = f"ver_{product_id}_{customer_id}_{inventory_id}_secure"
-    return json.dumps({"status": "verified", "verification_token": token, "message": "Verification valid. You may now call submit_final_order."})
+
 
 @tool
-def submit_final_order(product_id: int, quantity: int, inventory_id: int, customer_id: int, verification_token: str) -> str:
+def place_order_with_token(verification_token: str) -> str:
     """
-    Use this tool to place the FINAL order.
-    Requirements:
-    1. `product_id`, `inventory_id`, `customer_id` MUST be integers.
-    2. `verification_token` MUST be obtained from `verify_order_details`.
+    Use this tool to PLACE the final order using a verification token.
+    You must obtain the token from `create_token_order` first.
     """
+    if not verification_token:
+        return "Error: Verification token is required."
+
     try:
-        if not verification_token or not verification_token.startswith("ver_"):
-            return "Error: Invalid or missing `verification_token`. You MUST call `verify_order_details` first to get a token."
+        endpoint = f"{API_BASE_URL}/api/v1/ai_work/place_order"
+        payload = {"verification_token": verification_token}
 
-        # 1. Define the API endpoint
-        endpoint = f"{API_BASE_URL}/api/v1/orders/place-order"
-        
-        # 2. Construct the payload matching OrderCreate schema
-        # {
-        #   "customer_id": 123,
-        #   "items": [ { "animal_id": 456, "inventory_id": 789, "quantity": 1 } ]
-        # }
-        
-        payload = {
-            "customer_id": int(customer_id),
-            "items": [
-                {
-                    "animal_id": int(product_id),
-                    "inventory_id": int(inventory_id),
-                    "quantity": quantity
-                }
-            ]
-        }
-
-
-        # 3. Make the REST API call (POST request)
         response = requests.post(endpoint, json=payload)
-        response.raise_for_status()
-        
-        # 4. Parse the response
-        order_details = response.json()
-        order_id = order_details.get("id", "Unknown")
-        order_number = order_details.get("order_number", "Unknown")
 
-        return f"Order placed successfully! Order ID: {order_id}, Order Number: {order_number}."
-        
+        if response.status_code != 200:
+            return f"Error placing order: {response.text}"
+
+        result = response.json()
+
+        if result.get("status") == "error":
+            return f"Order Placement Failed: {result.get('message')}"
+
+        return f"Order Placed Successfully! Order ID: {result.get('order_id')}, Order Number: {result.get('order_number')}"
+
     except requests.exceptions.RequestException as e:
-        return f"Error placing order: {e}. Response: {e.response.text if e.response else 'No response'}"
+        return f"Error placing order: {e}"
+
 
 @tool
 def search_products(query: str) -> str:
@@ -109,25 +100,26 @@ def search_products(query: str) -> str:
         response = requests.get(endpoint)
         response.raise_for_status()
         products = response.json()
-                    
+
         # 2. Perform simple client-side search
         query = query.lower().strip()
         matches = []
-        
+
         if query == "all" or query == "":
             matches = products
         else:
             for product in products:
                 # Search in name, species, and description
                 text_to_search = f"{product['name']} {product['species']} {product.get('description', '')}".lower()
-                
+
                 if query in text_to_search:
                     matches.append(product)
-        
-        return json.dumps(matches)  
+
+        return matches
 
     except requests.exceptions.RequestException as e:
         return f"Error searching products: {e}"
+
 
 @tool
 def search_customers(query: str) -> str:
@@ -141,23 +133,24 @@ def search_customers(query: str) -> str:
         response = requests.get(endpoint)
         response.raise_for_status()
         customers = response.json()
-        
+
         # 2. Client-side search
         query = query.lower()
         matches = []
-        
+
         for cust in customers:
             text_to_search = f"{cust['first_name']} {cust['last_name']} {cust['email']} {cust['phone']}".lower()
             if query in text_to_search:
                 matches.append(cust)
-        
-        if not matches:
-            return "No customers found matching the query."
-        
-        return json.dumps(matches)    
+
+        # if not matches:
+        #     return "No customers found matching the query."
+
+        return matches
 
     except requests.exceptions.RequestException as e:
         return "Error searching customers: " + str(e)
+
 
 @tool
 def search_inventory_stock() -> str:
@@ -171,11 +164,12 @@ def search_inventory_stock() -> str:
         response = requests.get(endpoint)
         response.raise_for_status()
         inventories = response.json()
-        
-        return json.dumps(inventories)
+
+        return inventories
 
     except requests.exceptions.RequestException as e:
         return f"Error searching Stock Inventory: {e}"
+
 
 @tool
 def search_inventory_stock_list(query: str) -> str:
@@ -189,30 +183,35 @@ def search_inventory_stock_list(query: str) -> str:
         response = requests.get(endpoint)
         response.raise_for_status()
         inventories = response.json()
-        
+
         # 2. Client-side search
         query = query.lower().strip()
         matches = []
-        
+
         if query == "all" or query == "":
-             matches = inventories
+            matches = inventories
         else:
             for inventory in inventories:
                 # Handle potential None for animal
-                animal_name = inventory.get('animal', {}).get('name', "Unknown") if inventory.get('animal') else "Unknown"
+                animal_name = (
+                    inventory.get("animal", {}).get("name", "Unknown")
+                    if inventory.get("animal")
+                    else "Unknown"
+                )
                 # NOTE: API now returns `product_id`, so we check that first.
-                prod_id = inventory.get('product_id', '')
+                prod_id = inventory.get("product_id", "")
                 text_to_search = f"{inventory.get('id', '')} {prod_id} {inventory.get('quantity', '')} {inventory.get('unit_price', '')} {inventory.get('location', '')} {inventory.get('status', '')} {animal_name}".lower()
                 if query in text_to_search:
                     matches.append(inventory)
-        
+
         if not matches:
             return "No inventories found matching the query."
 
-        return json.dumps(matches)
+        return matches
 
     except requests.exceptions.RequestException as e:
         return f"Error searching Stock Inventory: {e}"
+
 
 @tool
 def check_inventory_for_product(product_id: int) -> str:
@@ -224,17 +223,17 @@ def check_inventory_for_product(product_id: int) -> str:
         # Update endpoint to new route
         endpoint = f"{API_BASE_URL}/api/v1/inventories/product/{product_id}"
         response = requests.get(endpoint)
-        
+
         if response.status_code == 404:
-             return "No inventory found for this product_id."
+            return "No inventory found for this product_id."
 
         response.raise_for_status()
         inventories = response.json()
-        
+
         if not inventories:
             return "No inventory found for this product_id."
-            
-        return json.dumps(inventories)
+
+        return inventories
 
     except requests.exceptions.RequestException as e:
         if e.response is not None and e.response.status_code == 404:
@@ -247,11 +246,11 @@ if __name__ == "__main__":
     # print(search_products.invoke("sheep")) # Use invoke for tools
 
     # # Assuming there are customers, otherwise this might return "No customers found"
-    # print("\n--- Testing search_customers ---")
-    # print(search_customers.invoke("kalaiprrethi"))
+    print("\n--- Testing search_customers ---")
+    print(search_customers.invoke("kalai"))
 
-    print("--- Testing search_inventory_stock ---")
-    print(search_inventory_stock.invoke(""))
+    # print("--- Testing search_inventory_stock ---")
+    # print(search_inventory_stock.invoke(""))
 
     # print("--- Testing search_inventory_stock_list ---")
     # print(search_inventory_stock_list.invoke("available stock"))
