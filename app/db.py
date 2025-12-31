@@ -20,6 +20,7 @@ TrackingSessionLocal = sessionmaker(
 
 # Define TrackingBase here so it can be imported by tracking models
 TrackingBase = declarative_base()
+Base = declarative_base()
 
 
 def get_db() -> Generator:

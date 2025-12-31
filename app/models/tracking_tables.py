@@ -1,39 +1,19 @@
-from sqlalchemy import Column, Integer, String, Date, Enum, Float, ForeignKey
+from sqlalchemy import (
+    Integer,
+    String,
+    Date,
+    Float,
+    ForeignKey,
+    DateTime,
+    Text,
+)
 from sqlalchemy.sql import func
+from sqlalchemy.orm import relationship, mapped_column, Mapped
+from typing import Optional
 from app.db import TrackingBase
-import enum
+from app.models.common import Tracking_Animal
 
-class AnimalSource(enum.Enum):
-    birth = "birth"
-    purchase = "purchase"
-
-class AnimalStatus(enum.Enum):
-    alive = "alive"
-    sold = "sold"
-    dead = "dead"
-    transferred = "transferred"
-
-class Animal(TrackingBase):
-    __tablename__ = "animals"
-    __table_args__ = {
-        "mysql_engine": "InnoDB",
-        "mysql_charset": "utf8mb4",
-        "mysql_collate": "utf8mb4_unicode_ci",
-    }
-
-
-    id = Column(Integer, primary_key=True, index=True)
-    tag_id = Column(String(50), unique=True, index=True)  # ear tag / QR
-    species = Column(String(50))  # cow, goat, sheep
-    breed = Column(String(50))
-    gender = Column(String(10))
-    birth_date = Column(Date, nullable=True)
-    source = Column(Enum(AnimalSource))
-    source_reference = Column(String(100))  # vendor / mother id
-    purchase_price = Column(Float, nullable=True)
-
-    status = Column(Enum(AnimalStatus), default=AnimalStatus.alive)
-    created_at = Column(Date, server_default=func.current_date())
+# class Tracking_Animal moved to app.models.common
 
 
 class AnimalEvent(TrackingBase):
@@ -44,8 +24,91 @@ class AnimalEvent(TrackingBase):
         "mysql_collate": "utf8mb4_unicode_ci",
     }
 
-    id = Column(Integer, primary_key=True)
-    animal_id = Column(Integer, ForeignKey("animals.id"), nullable=False,index=True)
-    event_type = Column(String(50))  # vaccination, weight_check, sale
-    event_date = Column(Date)
-    notes = Column(String(255))
+    id: Mapped[int] = mapped_column(primary_key=True)
+    animal_id: Mapped[int] = mapped_column(
+        ForeignKey("animal_tracking.id", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
+    )
+
+    event_type: Mapped[str] = mapped_column(String(50))
+    event_date: Mapped[Optional[Date]] = mapped_column(Date)
+    notes: Mapped[Optional[str]] = mapped_column(Text)
+
+    created_at: Mapped[DateTime] = mapped_column(
+        DateTime, server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[DateTime] = mapped_column(
+        DateTime,
+        server_default=func.now(),
+        server_onupdate=func.now(),
+        nullable=False,
+    )
+
+    animal: Mapped["Tracking_Animal"] = relationship(
+        back_populates="events",
+        lazy="selectin",
+    )
+
+
+class AnimalInventoryMove(TrackingBase):
+    __tablename__ = "animal_inventory_moves"
+    __table_args__ = {
+        "mysql_engine": "InnoDB",
+        "mysql_charset": "utf8mb4",
+        "mysql_collate": "utf8mb4_unicode_ci",
+    }
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    animal_id: Mapped[int] = mapped_column(
+        ForeignKey("animal_tracking.id", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
+    )
+    is_move_to_inventory: Mapped[int] = mapped_column(Integer)
+    movement_type: Mapped[str] = mapped_column(String(50))
+    movement_date: Mapped[Optional[Date]] = mapped_column(Date)
+    notes: Mapped[Optional[str]] = mapped_column(Text)
+
+    created_at: Mapped[DateTime] = mapped_column(
+        DateTime, server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[DateTime] = mapped_column(
+        DateTime, server_default=func.now(), server_onupdate=func.now(), nullable=False
+    )
+
+    animal: Mapped["Tracking_Animal"] = relationship(
+        back_populates="inventory_items",
+        lazy="selectin",
+    )
+
+
+class PurchaseRawMaterial(TrackingBase):
+    __tablename__ = "purchase_raw_materials"
+    __table_args__ = {
+        "mysql_engine": "InnoDB",
+        "mysql_charset": "utf8mb4",
+        "mysql_collate": "utf8mb4_unicode_ci",
+    }
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    material_name: Mapped[str] = mapped_column(Text)
+    type_of_material: Mapped[str] = mapped_column(Text)  # feed, medicine, etc
+    purchase_date: Mapped[Optional[Date]] = mapped_column(Date)
+    quantity: Mapped[int] = mapped_column(Integer)
+    unit_price: Mapped[float] = mapped_column(Float)
+    material_expiry_date: Mapped[Optional[Date]] = mapped_column(Date)
+    batch_number: Mapped[Optional[str]] = mapped_column(Text)
+    supplier: Mapped[Optional[str]] = mapped_column(Text)
+    total_price: Mapped[float] = mapped_column(Float)
+    notes: Mapped[Optional[str]] = mapped_column(Text)
+    gross_price: Mapped[float] = mapped_column(Float)
+    discount_amount: Mapped[float] = mapped_column(Float)
+    discount_percentage: Mapped[float] = mapped_column(Float)
+    material_description: Mapped[Optional[str]] = mapped_column(Text)
+    created_at: Mapped[DateTime] = mapped_column(
+        DateTime, server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[DateTime] = mapped_column(
+        DateTime, server_default=func.now(), server_onupdate=func.now(), nullable=False
+    )

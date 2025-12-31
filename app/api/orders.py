@@ -46,7 +46,7 @@ def place_order(payload: OrderCreate, db: Session = Depends(get_db)):
         items.append(
             {
                 "order_item_id": it.id,
-                "product_id": it.product_id,
+                "product_id": it.animal_id,
                 "quantity": it.quantity,
                 "unit_price": float(it.unit_price),
                 "total_price": float(it.total_price),
@@ -78,7 +78,7 @@ def get_orders(limit: int = 50, offset: int = 0, db: Session = Depends(get_db)):
             items.append(
                 {
                     "order_item_id": it.id,
-                    "product_id": it.product_id,
+                    "product_id": it.animal_id,
                     "quantity": it.quantity,
                     "unit_price": float(it.unit_price),
                     "total_price": float(it.total_price),
@@ -160,7 +160,7 @@ def get_order(order_id: int, db: Session = Depends(get_db)):
         items.append(
             {
                 "order_item_id": it.id,
-                "product_id": it.product_id,
+                "product_id": it.animal_id,
                 "quantity": it.quantity,
                 "unit_price": float(it.unit_price),
                 "total_price": float(it.total_price),

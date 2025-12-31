@@ -1,4 +1,3 @@
-from datetime import datetime
 from sqlalchemy import (
     Column,
     Integer,
@@ -13,33 +12,10 @@ from sqlalchemy import (
     text,
 )
 from sqlalchemy.orm import relationship
+from app.models.common import Animal
+from app.db import Base
 
-from . import Base
-
-
-class Animal(Base):
-    __tablename__ = "animals"
-    __table_args__ = {
-        "mysql_engine": "InnoDB",
-        "mysql_charset": "utf8mb4",
-        "mysql_collate": "utf8mb4_unicode_ci",
-    }
-
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    sku = Column(String(64), unique=True, nullable=False)
-    species = Column(String(64), nullable=False)
-    name = Column(String(128), nullable=False)
-    description = Column(Text)
-    base_price = Column(DECIMAL(10, 2), nullable=False)
-    specs = Column(JSON, nullable=True)
-    created_at = Column(
-        TIMESTAMP, nullable=False, server_default=text("CURRENT_TIMESTAMP")
-    )
-    updated_at = Column(
-        TIMESTAMP,
-        nullable=True,
-        server_default=text("CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"),
-    )
+# class Animal moved to app.models.common
 
 
 class Inventory(Base):
