@@ -1,8 +1,8 @@
 from decimal import Decimal
-from typing import List
+from typing import List, Optional, Dict
 
 from sqlalchemy.orm import Session
-from sqlalchemy import select, update
+from sqlalchemy import select
 import uuid
 
 from app.models.tables import (
@@ -26,9 +26,6 @@ def list_orders(db: Session, limit: int = 50, offset: int = 0):
 def _generate_order_number(db: Session) -> str:
     # Use a UUID4-based short order number to avoid race conditions
     return f"ORD-{uuid.uuid4().hex[:12].upper()}"
-
-
-from typing import Optional, Dict
 
 
 def create_order(db: Session, *, customer_id: int | None = None, customer_data: Optional[Dict] = None, items: List[dict], shipping: float = 0.0, tax: float = 0.0) -> Order:
@@ -69,11 +66,11 @@ def create_order(db: Session, *, customer_id: int | None = None, customer_data: 
             else:
                 # try to find an inventory entry for the animal
                 inv = db.execute(
-                    select(Inventory).where(Inventory.animal_id == it["animal_id"]).limit(1)
+                    select(Inventory).where(Inventory.animal_id == it["product_id"]).limit(1)
                 ).scalars().first()
 
             if not inv:
-                raise ValueError(f"Inventory not found for animal_id={it['animal_id']}")
+                raise ValueError(f"Inventory not found for animal_id={it['product_id']}")
 
             if inv.quantity < it["quantity"]:
                 raise ValueError(f"Insufficient stock for inventory id {inv.id}")
@@ -98,7 +95,7 @@ def create_order(db: Session, *, customer_id: int | None = None, customer_data: 
 
         # create order items and decrement inventory
         for it in items:
-            inv_id = it.get("inventory_id") or next(k for k, v in inventory_map.items() if v.animal_id == it["animal_id"])
+            inv_id = it.get("inventory_id") or next(k for k, v in inventory_map.items() if v.animal_id == it["product_id"])
             inv = inventory_map[inv_id]
 
             unit_price = inv.unit_price if inv.unit_price is not None else Decimal("0.00")
@@ -106,7 +103,7 @@ def create_order(db: Session, *, customer_id: int | None = None, customer_data: 
 
             order_item = OrderItem(
                 order_id=order.id,
-                animal_id=it["animal_id"],
+                animal_id=it["product_id"],
                 inventory_id=inv.id,
                 quantity=it["quantity"],
                 unit_price=unit_price,
@@ -123,3 +120,19 @@ def create_order(db: Session, *, customer_id: int | None = None, customer_data: 
     # refresh and return
     db.refresh(order)
     return order
+
+
+if __name__ == "__main__":
+    from app.db import SessionLocal, TrackingSessionLocal
+
+    db_main = SessionLocal()
+    db_track = TrackingSessionLocal()
+
+    try:
+        events = list_orders(db_main)
+        for e in events:
+            print(vars(e))
+        # print("Synced events:", events)
+    finally:
+        db_main.close()
+        db_track.close()

@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.api import health, orders, customers, addresses, animals, inventories
+from app.api import health, orders, customers, addresses, animals, inventories, ai_work, t_animals, t_animal_move, t_animal_event, t_material_management
 
 def create_app() -> FastAPI:
     """Create and configure FastAPI application."""
@@ -33,7 +33,11 @@ def create_app() -> FastAPI:
     app.include_router(addresses.router, tags=["addresses"])
     app.include_router(animals.router, tags=["products"])
     app.include_router(inventories.router, tags=["inventories"])
-    
+    app.include_router(ai_work.router, tags=["ai_work"])
+    app.include_router(t_animals.router, tags=["t_animals"])
+    app.include_router(t_animal_move.router, tags=["t_inventory_animals"])
+    app.include_router(t_animal_event.router, tags=["t_animal_events"])
+    app.include_router(t_material_management.router, tags=["t_material_management"])
     return app
 
 
