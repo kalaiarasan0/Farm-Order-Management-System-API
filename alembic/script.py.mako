@@ -28,13 +28,12 @@ def upgrade_default():
     ${default_upgrades if default_upgrades else "pass"}
 
 
-def upgrade_tracking():
-    ${tracking_upgrades if tracking_upgrades else "pass"}
-
+def upgrade_user():
+    ${user_upgrades if user_upgrades else "pass"}
 
 def downgrade_default():
     ${default_downgrades if default_downgrades else "pass"}
 
 
-def downgrade_tracking():
-    ${tracking_downgrades if tracking_downgrades else "pass"}
+def downgrade_user():
+    ${user_downgrades if user_downgrades else "pass"}

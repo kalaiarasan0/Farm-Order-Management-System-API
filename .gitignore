@@ -14,6 +14,7 @@ ENV/
 .idea/
 *.swp
 *.swo
+.github
 
 # Environment variables
 .env
