@@ -1,13 +1,19 @@
-from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
-from app.models.tracking_tables import PurchaseRawMaterial
+from app.models.tables import PurchaseRawMaterial
 from typing import List, Optional
+from fastapi import HTTPException
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, delete
+from app.schemas.users import User
 
 PRICE_FIELDS = {"quantity", "unit_price", "total_price"}
 
-def create_purchase_material(db: Session, data: dict) -> PurchaseRawMaterial:
+
+async def create_purchase_material(
+    db: AsyncSession, data: dict, current_user: User
+) -> PurchaseRawMaterial:
     try:
-        price_details = calculate_price_details(
+        price_details = await calculate_price_details(
             quantity=data.get("quantity"),
             unit_price=data.get("unit_price"),
             total_price=data.get("total_price"),
@@ -28,28 +34,35 @@ def create_purchase_material(db: Session, data: dict) -> PurchaseRawMaterial:
             batch_number=data.get("material_batch_number"),
             supplier=data.get("material_supplier"),
             material_description=data.get("material_description"),
+            created_by=str(current_user.unique_id),
         )
 
         db.add(purchase_material)
-        db.commit()
-        db.refresh(purchase_material)
+        await db.commit()
+        await db.refresh(purchase_material)
         return purchase_material
     except SQLAlchemyError:
-        db.rollback()
+        await db.rollback()
         raise
 
-def update_purchase_material(db: Session, purchase_material_id: int, data: dict) -> PurchaseRawMaterial:
+
+async def update_purchase_material(
+    db: AsyncSession, purchase_material_id: int, data: dict, current_user: User
+) -> PurchaseRawMaterial:
     try:
-        purchase_material = db.query(PurchaseRawMaterial).filter(PurchaseRawMaterial.id == purchase_material_id).first()
+        purchase_material_stmt = select(PurchaseRawMaterial).where(
+            PurchaseRawMaterial.id == purchase_material_id
+        )
+        purchase_material = await db.execute(purchase_material_stmt)
+        purchase_material = purchase_material.scalar_one_or_none()
         if purchase_material is None:
-            raise ValueError("Purchase material not found")
+            raise HTTPException(status_code=404, detail="Purchase material not found")
 
         # Track if price fields changes
         price_changed = False
         total_price_explicitly_nullable = False
 
         for field, value in data.items():
-
             if field == "total_price" and value is None:
                 total_price_explicitly_nullable = True
                 price_changed = True
@@ -63,13 +76,12 @@ def update_purchase_material(db: Session, purchase_material_id: int, data: dict)
 
                 if field in PRICE_FIELDS:
                     price_changed = True
-        
+
         if price_changed:
-            
             if total_price_explicitly_nullable:
                 purchase_material.total_price = None
-                
-            price_details = calculate_price_details(
+
+            price_details = await calculate_price_details(
                 quantity=purchase_material.quantity,
                 unit_price=purchase_material.unit_price,
                 total_price=purchase_material.total_price,
@@ -78,24 +90,33 @@ def update_purchase_material(db: Session, purchase_material_id: int, data: dict)
             purchase_material.gross_price = price_details.get("gross_price")
             purchase_material.total_price = price_details.get("total_price")
             purchase_material.discount_amount = price_details.get("discount_amount")
-            purchase_material.discount_percentage = price_details.get("discount_percentage")
+            purchase_material.discount_percentage = price_details.get(
+                "discount_percentage"
+            )
 
-        db.commit()
-        db.refresh(purchase_material)
+        purchase_material.updated_by = str(current_user.unique_id)
+        await db.commit()
+        await db.refresh(purchase_material)
         return purchase_material
 
     except SQLAlchemyError:
-        db.rollback()
+        await db.rollback()
         raise
 
 
-def calculate_price_details(quantity: Optional[float], unit_price: Optional[float], total_price: Optional[float]):
+async def calculate_price_details(
+    quantity: Optional[float], unit_price: Optional[float], total_price: Optional[float]
+):
     # Basic validation
     if quantity is None or unit_price is None:
-        raise ValueError("quantity and unit_price are required")
+        raise HTTPException(
+            status_code=400, detail="quantity and unit_price are required"
+        )
 
     if quantity <= 0 or unit_price <= 0:
-        raise ValueError("quantity and unit_price must be greater than zero")
+        raise HTTPException(
+            status_code=400, detail="quantity and unit_price must be greater than zero"
+        )
 
     gross_price = quantity * unit_price
 
@@ -113,7 +134,10 @@ def calculate_price_details(quantity: Optional[float], unit_price: Optional[floa
 
     # Prevent negative discount (price increased)
     if discount_amount < 0:
-        raise ValueError("total_price cannot be greater than quantity × unit_price")
+        raise HTTPException(
+            status_code=400,
+            detail="total_price cannot be greater than quantity × unit_price",
+        )
 
     discount_percentage = (discount_amount / gross_price) * 100
 
@@ -124,24 +148,33 @@ def calculate_price_details(quantity: Optional[float], unit_price: Optional[floa
         "discount_percentage": round(discount_percentage, 2),
     }
 
-def get_purchase_material(db: Session, material_id: int) -> PurchaseRawMaterial:
-    return db.query(PurchaseRawMaterial).filter(PurchaseRawMaterial.id == material_id).first()
 
-def delete_purchase_material(db: Session, material_id: int) -> PurchaseRawMaterial:
+async def get_purchase_material(
+    db: AsyncSession, material_id: int, current_user:User
+) -> PurchaseRawMaterial:
+    stmt = select(PurchaseRawMaterial).where(PurchaseRawMaterial.id == material_id, PurchaseRawMaterial.created_by == str(current_user.unique_id))
+    result = await db.execute(stmt)
+    return result.scalar_one_or_none()
+
+
+async def delete_purchase_material(db: AsyncSession, material_id: int, current_user:User) -> dict:
     try:
-        raw_material = db.query(PurchaseRawMaterial).filter(PurchaseRawMaterial.id == material_id).first()
-        if raw_material is None:
-            raise ValueError("Raw material not found")
-        db.delete(raw_material)
-        db.commit()
-        return raw_material
+        stmt = delete(PurchaseRawMaterial).where(PurchaseRawMaterial.id == material_id, PurchaseRawMaterial.created_by == str(current_user.unique_id))
+        raw_material = await db.execute(stmt)
+        await db.commit()
+
+        if raw_material.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Raw material not found")
+        return {"message": "Raw material deleted successfully"}
+
     except SQLAlchemyError:
-        db.rollback()
+        await db.rollback()
         raise
 
-def list_purchase_materials(db: Session, limit: int = 50, offset: int = 0) -> List[PurchaseRawMaterial]:
-    return (db.query(PurchaseRawMaterial)
-            .limit(limit)
-            .offset(offset)
-            .all()
-        )
+
+async def list_purchase_materials(
+    db: AsyncSession, current_user:User, limit: int = 50, offset: int = 0
+) -> List[PurchaseRawMaterial]:
+    stmt = select(PurchaseRawMaterial).limit(limit).offset(offset).filter(PurchaseRawMaterial.created_by == str(current_user.unique_id))
+    result = await db.execute(stmt)
+    return result.scalars().all()

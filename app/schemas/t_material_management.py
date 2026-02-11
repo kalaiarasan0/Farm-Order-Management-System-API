@@ -47,3 +47,4 @@ class MaterialResponse(BaseModel):
     gross_price: float
     discount_amount: float
     discount_percentage: float
+    

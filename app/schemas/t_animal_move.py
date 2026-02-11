@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional
 from datetime import date, datetime
 
@@ -19,3 +19,19 @@ class MovementResponse(BaseModel):
 class Cronjob(BaseModel):
     run_time: datetime
     data : Optional[list]
+
+class TrackingMovementResponse(BaseModel):
+    
+    movement_date: date
+    movement_type: str
+    notes: str | None
+    is_move_to_inventory: int
+    tag_id: str
+    animal_id: int
+    status: str
+
+    model_config = ConfigDict(from_attributes=True)
+
+class TrackingMovementListResponse(BaseModel):
+    data: list[TrackingMovementResponse]
+    count: int

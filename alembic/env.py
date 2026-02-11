@@ -22,13 +22,13 @@ except Exception:
 logger = logging.getLogger("alembic.env")
 
 # Import project models and settings
-from app.models import Base, TrackingBase  # noqa: E402
+from app.db.base import Base, UserBase  # noqa: E402
 from app.config import settings  # noqa: E402
 
 # Map specific databases to their metadata
 target_metadata = {
     "default": Base.metadata,
-    "tracking": TrackingBase.metadata,
+    "user": UserBase.metadata
 }
 
 
@@ -46,7 +46,7 @@ def run_migrations_offline() -> None:
     # Database URLs
     db_urls = {
         "default": settings.DATABASE_URL,
-        "tracking": settings.TRACKING_DATABASE_URL,
+        "user": settings.USER_DATABASE_URL,
     }
 
     for name, url in db_urls.items():
@@ -72,11 +72,11 @@ def run_migrations_online() -> None:
     """
 
     # We can import engines directly from app.db to ensure we use the same config
-    from app.db import engine as run_engine, tracking_engine
+    from app.db.database import engine as run_engine, user_engine
 
     engines = {
         "default": run_engine,
-        "tracking": tracking_engine,
+        "user": user_engine
     }
 
     for name, engine in engines.items():

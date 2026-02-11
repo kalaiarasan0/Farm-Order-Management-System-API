@@ -120,10 +120,6 @@ Business logic goes in `app/services/` and is called from API handlers.
 
 Database models go in `app/models/` using SQLAlchemy.
 
-## License
-
-MIT
-
 
 ### Alembic comments to migrate
 alembic revision --autogenerate -m "file name" - suffix

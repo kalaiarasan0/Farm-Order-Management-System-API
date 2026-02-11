@@ -1,12 +1,12 @@
-from pydantic import BaseModel, model_validator
-from typing import Optional
+from pydantic import BaseModel, model_validator, ConfigDict, Field
+from typing import Optional, List
 from datetime import datetime, date
-from app.schemas.enums import AnimalSource, AnimalStatus
+from app.schemas.enums import AnimalSource, AnimalStatus, OrderStatus
 from app.schemas.t_animal_event import AnimalEventResponse
 from app.schemas.t_animal_move import MovementResponse
 
 class AnimalCreate(BaseModel):
-    animal_id: int
+    category_id: int
     gender: str
     birth_date: Optional[date] = None
     purchase_date: Optional[date] = None
@@ -32,7 +32,8 @@ class AnimalCreate(BaseModel):
 class AnimalResponse(BaseModel):
     id: int
     tag_id: str
-    main_animal_id: int
+    category_id: int
+    category_name: Optional[str] = None
     gender: str
     birth_date: Optional[date] = None
     purchase_date: Optional[date] = None
@@ -40,13 +41,18 @@ class AnimalResponse(BaseModel):
     source_reference: Optional[str] = None
     purchase_price: Optional[float] = None
     status: AnimalStatus
+    order_item_id: Optional[int] = None
+    order_status: Optional[OrderStatus] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
-    events: Optional[list[AnimalEventResponse]] = []
-    inventory_items: Optional[list[MovementResponse]] = []
+    events: Optional[List[AnimalEventResponse]] = Field(default_factory=list)
+    inventory_items: Optional[List[MovementResponse]] = Field(default_factory=list)
+    image_url: Optional[str] = None
+    model_config = ConfigDict(from_attributes=True)
+
 
 class AnimalUpdate(BaseModel):
-    main_animal_id: Optional[int] = None
+    category_id: Optional[int] = None
     gender: Optional[str] = None
     birth_date: Optional[date] = None
     purchase_date: Optional[date] = None
@@ -68,3 +74,9 @@ class AnimalUpdate(BaseModel):
             raise ValueError("birth_date is required when source is 'birth'")
         
         return self
+
+class AnimalLookupResponse(BaseModel):
+    id: int
+    tag_id: str
+    category_id: int
+    category_name: Optional[str]
