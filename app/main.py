@@ -64,10 +64,16 @@ def create_app() -> FastAPI:
     app.include_router(auth.router)
     app.include_router(dashboard.router)
 
-    #initiate prometheus
+    from strawberry.fastapi import GraphQLRouter
+    from app.graphql.schema import schema
+
+    graphql_app = GraphQLRouter(schema)
+    app.include_router(graphql_app, prefix="/graphql")
+
+    # initiate prometheus
     # We do this after including routers so it can label metrics by your route paths
     Instrumentator().instrument(app).expose(app, endpoint="/metrics")
-    
+
     # Mount static files
     app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="static")
 

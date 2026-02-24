@@ -53,16 +53,16 @@ class Animal(Base):
     )
 
     tracking_animals = relationship(
-        "Tracking_Animal",
-        back_populates="category",
-        cascade="all, delete-orphan"
+        "Tracking_Animal", back_populates="category", cascade="all, delete-orphan"
     )
 
 
 class Inventory(Base):
     __tablename__ = "inventory"
     __table_args__ = (
-        UniqueConstraint("animal_id", "created_by", name="uq_inventory_animal_id_created_by"),
+        UniqueConstraint(
+            "animal_id", "created_by", name="uq_inventory_animal_id_created_by"
+        ),
         {
             "mysql_engine": "InnoDB",
             "mysql_charset": "utf8mb4",
@@ -152,7 +152,9 @@ class Address(Base):
 class Order(Base):
     __tablename__ = "orders"
     __table_args__ = (
-        UniqueConstraint("order_number", "created_by", name="uq_orders_order_number_created_by"),
+        UniqueConstraint(
+            "order_number", "created_by", name="uq_orders_order_number_created_by"
+        ),
         {
             "mysql_engine": "InnoDB",
             "mysql_charset": "utf8mb4",
@@ -277,7 +279,9 @@ class Payment(Base):
 class OrderVerificationToken(Base):
     __tablename__ = "order_verification_tokens"
     __table_args__ = (
-        UniqueConstraint("token", "created_by", name="uq_order_verification_tokens_token_created_by"),
+        UniqueConstraint(
+            "token", "created_by", name="uq_order_verification_tokens_token_created_by"
+        ),
         {
             "mysql_engine": "InnoDB",
             "mysql_charset": "utf8mb4",
@@ -321,18 +325,21 @@ class PostOffice(Base):
 class Tracking_Animal(Base):
     __tablename__ = "animal_tracking"
     __table_args__ = (
-        UniqueConstraint("tag_id", "created_by", name="uq_animal_tracking_tag_id_created_by"),
+        UniqueConstraint(
+            "tag_id", "created_by", name="uq_animal_tracking_tag_id_created_by"
+        ),
         {
-        "mysql_engine": "InnoDB",
-        "mysql_charset": "utf8mb4",
-        "mysql_collate": "utf8mb4_unicode_ci",
-    })
+            "mysql_engine": "InnoDB",
+            "mysql_charset": "utf8mb4",
+            "mysql_collate": "utf8mb4_unicode_ci",
+        },
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
-    tag_id: Mapped[str] = mapped_column(
-        String(50), nullable=False, index=True
+    tag_id: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
+    category_id: Mapped[int] = mapped_column(
+        ForeignKey("animals.id", ondelete="RESTRICT"), nullable=True, index=True
     )
-    category_id: Mapped[int] = mapped_column(ForeignKey("animals.id", ondelete="RESTRICT"), nullable=True, index=True)
     gender: Mapped[str] = mapped_column(String(10), nullable=False)
 
     birth_date: Mapped[Optional[Date]] = mapped_column(Date, nullable=True)
@@ -411,6 +418,12 @@ class Tracking_Animal(Base):
     category: Mapped["Animal"] = relationship(
         back_populates="tracking_animals",
         lazy="selectin",
+    )
+
+    milk_collections: Mapped[List["MilkCollection"]] = relationship(
+        back_populates="animal",
+        lazy="selectin",
+        cascade="all, delete-orphan",
     )
 
 
@@ -525,3 +538,42 @@ class PurchaseRawMaterial(Base):
 
     created_by: Mapped[Optional[str]] = mapped_column(String(255), nullable=False)
     updated_by: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+
+
+class MilkCollection(Base):
+    __tablename__ = "milk_collections"
+    __table_args__ = {
+        "mysql_engine": "InnoDB",
+        "mysql_charset": "utf8mb4",
+        "mysql_collate": "utf8mb4_unicode_ci",
+    }
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    animal_id: Mapped[int] = mapped_column(
+        ForeignKey("animal_tracking.id", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
+    )
+    collection_date: Mapped[Optional[Date]] = mapped_column(Date)
+    collection_time: Mapped[Optional[str]] = mapped_column(String(50))
+    quantity: Mapped[int] = mapped_column(Integer)
+    milk_snf: Mapped[Optional[float]] = mapped_column(Float, index=True)
+    milk_fat: Mapped[Optional[float]] = mapped_column(Float, index=True)
+    milk_water: Mapped[Optional[float]] = mapped_column(Float, index=True)
+    milk_session: Mapped[Optional[str]] = mapped_column(String(50), index=True)
+    rate: Mapped[float] = mapped_column(Float)
+    total_price: Mapped[float] = mapped_column(Float)
+    notes: Mapped[Optional[str]] = mapped_column(Text)
+    created_at: Mapped[DateTime] = mapped_column(
+        DateTime, server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[DateTime] = mapped_column(
+        DateTime, server_default=func.now(), server_onupdate=func.now(), nullable=False
+    )
+    created_by: Mapped[Optional[str]] = mapped_column(String(255), nullable=False)
+    updated_by: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+
+    animal: Mapped["Tracking_Animal"] = relationship(
+        back_populates="milk_collections",
+        lazy="selectin",
+    )

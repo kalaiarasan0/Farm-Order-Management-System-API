@@ -124,13 +124,14 @@ async def get_animal_lookup_endpoint(
     search: str = "",
     filter: str = "",
     order_item_id: int = None,
+    animal_status: str = "",
     db: AsyncSession = Depends(get_async_db),
     current_user=Depends(get_current_active_user),
 ):
     "Get an animal lookup"
     try:
         animals = await get_animal_lookup(
-            db, current_user, search, filter, order_item_id
+            db, current_user, search, filter, order_item_id, animal_status
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))

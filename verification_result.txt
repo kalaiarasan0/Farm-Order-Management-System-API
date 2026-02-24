@@ -1,0 +1,12 @@
+Testing create_event with MILK event type...
+Result: <app.models.tables.MilkCollection object at 0x0000027B04649400>
+✅ Success: Result is instance of MilkCollection
+✅ Success: MilkCollection added to session
+✅ Success: Quantity matches
+✅ Success: Rate matches
+✅ Success: Total price matches
+
+Testing create_event with VACCINATION event type...
+✅ Success: Result is instance of AnimalEvent
+✅ Success: AnimalEvent added to session
+✅ Success: Event type matches

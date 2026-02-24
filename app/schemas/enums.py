@@ -9,7 +9,9 @@ class AnimalSource(Enum):
 class AnimalStatus(Enum):
     alive = "alive"
     sold = "sold"
-    dead = "dead"
+    deceased = "deceased"
+    consumed = "consumed"
+    lost = "lost"
     transferred = "transferred"
     in_inventory = "in_inventory"
 
