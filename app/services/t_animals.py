@@ -11,6 +11,8 @@ from .users import UPLOAD_DIR, UPLOAD_URL_PREFIX
 import os
 import shutil
 from uuid import uuid4
+from app.schemas.enums import AnimalStatus
+
 
 async def create_animal(
     db: AsyncSession, data: dict, current_user: User
@@ -79,7 +81,7 @@ async def update_animal(
             setattr(animal, field, value)
 
     animal.updated_by = str(current_user.unique_id)
-
+    animal.updated_at = func.now()
     try:
         await db.commit()
         await db.refresh(animal)
@@ -92,7 +94,9 @@ async def update_animal(
     return {"message": "Animal updated successfully", "animal_id": animal.id}
 
 
-async def list_animals(db: AsyncSession, current_user:User, limit: int = 50, offset: int = 0) -> List:
+async def list_animals(
+    db: AsyncSession, current_user: User, limit: int = 50, offset: int = 0
+) -> List:
     # 1️⃣ Get tracking animals
     tracking_animals = (
         (
@@ -129,13 +133,15 @@ async def list_animals(db: AsyncSession, current_user:User, limit: int = 50, off
     return [
         {
             **ta.__dict__,
-            "animal_name": animal_map.get(ta.category_id),
+            "category_name": animal_map.get(ta.category_id),
         }
         for ta in tracking_animals
     ]
 
 
-async def get_animal_by_id(db: AsyncSession, animal_id: int, current_user:User) -> Tracking_Animal:
+async def get_animal_by_id(
+    db: AsyncSession, animal_id: int, current_user: User
+) -> Tracking_Animal:
     ta = (
         await db.execute(
             select(Tracking_Animal)
@@ -161,7 +167,9 @@ async def get_animal_by_id(db: AsyncSession, animal_id: int, current_user:User) 
     }
 
 
-async def get_animal_by_tag_id(db: AsyncSession, tag_id: str, current_user:User) -> Tracking_Animal:
+async def get_animal_by_tag_id(
+    db: AsyncSession, tag_id: str, current_user: User
+) -> Tracking_Animal:
     pattern = f"%{tag_id}%"
     tracking_animals = (
         (
@@ -203,16 +211,25 @@ async def get_animal_by_tag_id(db: AsyncSession, tag_id: str, current_user:User)
     ]
 
 
-async def get_count_animals(db: AsyncSession, current_user:User) -> int:
-    return (await db.execute(select(func.count(Tracking_Animal.id)).filter(Tracking_Animal.created_by == str(current_user.unique_id)))).scalar_one()
+async def get_count_animals(db: AsyncSession, current_user: User) -> int:
+    return (
+        await db.execute(
+            select(func.count(Tracking_Animal.id)).filter(
+                Tracking_Animal.created_by == str(current_user.unique_id)
+            )
+        )
+    ).scalar_one()
 
 
 async def map_animal_to_order_item(
-    db: AsyncSession, animal_id: int, order_item_id: int, current_user:User
+    db: AsyncSession, animal_id: int, order_item_id: int, current_user: User
 ):
     animal = (
         await db.execute(
-            select(Tracking_Animal).filter(Tracking_Animal.id == animal_id, Tracking_Animal.created_by == str(current_user.unique_id))
+            select(Tracking_Animal).filter(
+                Tracking_Animal.id == animal_id,
+                Tracking_Animal.created_by == str(current_user.unique_id),
+            )
         )
     ).scalar_one_or_none()
     if not animal:
@@ -238,6 +255,16 @@ async def map_animal_to_order_item(
     if not order_item.animal_id == animal.category_id:
         raise HTTPException(status_code=400, detail="Category ID does not match")
 
+    animal_mapped_count = (
+        await db.execute(
+            select(func.count(Tracking_Animal.id)).filter(
+                Tracking_Animal.order_item_id == order_item_id
+            )
+        )
+    ).scalar_one()
+    if animal_mapped_count >= order_item.quantity:
+        raise HTTPException(status_code=400, detail="Order item is full")
+
     try:
         animal.order_item_id = order_item_id
         animal.order_status = order.order_status
@@ -256,8 +283,11 @@ async def get_animal_lookup(
     search: str = "",
     lookup_filter: str = "",
     order_item_id: int = None,
+    animal_status: str = "",
 ) -> dict:
-    query_stmt = select(Tracking_Animal).filter(Tracking_Animal.created_by == str(current_user.unique_id))
+    query_stmt = select(Tracking_Animal).filter(
+        Tracking_Animal.created_by == str(current_user.unique_id)
+    )
     if lookup_filter == "order_item":
         if order_item_id is None:
             raise HTTPException(status_code=400, detail="Order item ID is required")
@@ -271,6 +301,11 @@ async def get_animal_lookup(
         # Filter TrackingAnimal by the animal_id (category) from the order item
         query_stmt = query_stmt.filter(
             Tracking_Animal.category_id == order_item.animal_id
+        )
+
+    if animal_status == "in_inventory":
+        query_stmt = query_stmt.filter(
+            Tracking_Animal.status == AnimalStatus.in_inventory
         )
 
     if search:
@@ -302,10 +337,13 @@ async def get_animal_lookup(
     ]
 
 
-async def delete_animal(db: AsyncSession, animal_id: int, current_user:User):
+async def delete_animal(db: AsyncSession, animal_id: int, current_user: User):
     animal = (
         await db.execute(
-            select(Tracking_Animal).filter(Tracking_Animal.id == animal_id, Tracking_Animal.created_by == str(current_user.unique_id))
+            select(Tracking_Animal).filter(
+                Tracking_Animal.id == animal_id,
+                Tracking_Animal.created_by == str(current_user.unique_id),
+            )
         )
     ).scalar_one_or_none()
     if not animal:
@@ -315,7 +353,9 @@ async def delete_animal(db: AsyncSession, animal_id: int, current_user:User):
     return {"message": "Animal deleted successfully"}
 
 
-async def remove_mapped_animal(db: AsyncSession, animal_id: int, order_item_id: int, current_user:User):
+async def remove_mapped_animal(
+    db: AsyncSession, animal_id: int, order_item_id: int, current_user: User
+):
     animal = (
         await db.execute(
             select(Tracking_Animal).filter(
@@ -333,12 +373,17 @@ async def remove_mapped_animal(db: AsyncSession, animal_id: int, order_item_id: 
     await db.refresh(animal)
     return {"message": "Animal un-mapped successfully"}
 
-async def upload_animal_image(db: AsyncSession, animal_id: int, file: UploadFile, current_user:User):
-    try: 
 
+async def upload_animal_image(
+    db: AsyncSession, animal_id: int, file: UploadFile, current_user: User
+):
+    try:
         animal = (
             await db.execute(
-                select(Tracking_Animal).filter(Tracking_Animal.id == animal_id, Tracking_Animal.created_by == str(current_user.unique_id))
+                select(Tracking_Animal).filter(
+                    Tracking_Animal.id == animal_id,
+                    Tracking_Animal.created_by == str(current_user.unique_id),
+                )
             )
         ).scalar_one_or_none()
         if not animal:
@@ -363,6 +408,7 @@ async def upload_animal_image(db: AsyncSession, animal_id: int, file: UploadFile
     except Exception as e:
         await db.rollback()
         raise HTTPException(status_code=500, detail=f"Could not upload file: {str(e)}")
+
 
 # if __name__ == "__main__":
 #     from app.db.database import SessionLocal
