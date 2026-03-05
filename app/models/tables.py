@@ -426,6 +426,12 @@ class Tracking_Animal(Base):
         cascade="all, delete-orphan",
     )
 
+    weight_collections: Mapped[List["WeightCollection"]] = relationship(
+        back_populates="animal",
+        lazy="selectin",
+        cascade="all, delete-orphan",
+    )
+
 
 class AnimalEvent(Base):
     __tablename__ = "animal_events"
@@ -575,5 +581,38 @@ class MilkCollection(Base):
 
     animal: Mapped["Tracking_Animal"] = relationship(
         back_populates="milk_collections",
+        lazy="selectin",
+    )
+
+
+class WeightCollection(Base):
+    __tablename__ = "weight_collections"
+    __table_args__ = {
+        "mysql_engine": "InnoDB",
+        "mysql_charset": "utf8mb4",
+        "mysql_collate": "utf8mb4_unicode_ci",
+    }
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    animal_id: Mapped[int] = mapped_column(
+        ForeignKey("animal_tracking.id", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
+    )
+    weight_date: Mapped[Optional[Date]] = mapped_column(Date, nullable=True)
+    weight_kg: Mapped[float] = mapped_column(Float, nullable=False)
+    weight_unit: Mapped[str] = mapped_column(String(20), nullable=False, default="kg")
+    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[DateTime] = mapped_column(
+        DateTime, server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[DateTime] = mapped_column(
+        DateTime, server_default=func.now(), server_onupdate=func.now(), nullable=False
+    )
+    created_by: Mapped[Optional[str]] = mapped_column(String(255), nullable=False)
+    updated_by: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+
+    animal: Mapped["Tracking_Animal"] = relationship(
+        back_populates="weight_collections",
         lazy="selectin",
     )
