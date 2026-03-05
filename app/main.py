@@ -20,6 +20,7 @@ from app.api import (
     t_animal_move,
     t_animal_event,
     t_material_management,
+    t_weight_collection,
     auth,
     dashboard,
 )
@@ -61,6 +62,7 @@ def create_app() -> FastAPI:
     app.include_router(t_animal_move.router, tags=["t_inventory_animals"])
     app.include_router(t_animal_event.router, tags=["t_animal_events"])
     app.include_router(t_material_management.router, tags=["t_material_management"])
+    app.include_router(t_weight_collection.router, tags=["weight_collection"])
     app.include_router(auth.router)
     app.include_router(dashboard.router)
 
