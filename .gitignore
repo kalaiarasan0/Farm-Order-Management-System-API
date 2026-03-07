@@ -38,3 +38,12 @@ dist/
 # OS
 .DS_Store
 Thumbs.db
+
+
+# Ignore Alembic migration files
+alembic/versions/*
+!alembic/versions/__init__.py
+
+# Ignore Python cache
+__pycache__/
+.pytest_cache/

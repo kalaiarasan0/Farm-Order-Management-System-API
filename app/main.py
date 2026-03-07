@@ -6,7 +6,6 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 import os
-from prometheus_fastapi_instrumentator import Instrumentator
 from app.config import settings
 from app.api import (
     health,
@@ -71,10 +70,6 @@ def create_app() -> FastAPI:
 
     graphql_app = GraphQLRouter(schema)
     app.include_router(graphql_app, prefix="/graphql")
-
-    # initiate prometheus
-    # We do this after including routers so it can label metrics by your route paths
-    Instrumentator().instrument(app).expose(app, endpoint="/metrics")
 
     # Mount static files
     app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="static")

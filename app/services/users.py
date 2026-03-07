@@ -87,8 +87,6 @@ async def authenticate_user(db: AsyncSession, username: str, password: str):
     hashed_password = user.hashed_password
     if isinstance(hashed_password, bytes):
         hashed_password = hashed_password.decode("utf-8")
-    print(hashed_password)
-    print(password)
 
     if not await security.verify_password(password, hashed_password):
         return False
