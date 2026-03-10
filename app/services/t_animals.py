@@ -12,6 +12,7 @@ import os
 import shutil
 from uuid import uuid4
 from app.schemas.enums import AnimalStatus
+# from app.utils.cloudinary_upload import upload_file
 
 
 async def create_animal(
@@ -408,6 +409,34 @@ async def upload_animal_image(
     except Exception as e:
         await db.rollback()
         raise HTTPException(status_code=500, detail=f"Could not upload file: {str(e)}")
+
+# async def upload_animal_image(
+#     db: AsyncSession, animal_id: int, file: UploadFile, current_user: User
+# ):
+#     try:
+#         if file.content_type not in ["image/jpeg", "image/png", "image/webp"]:
+#             raise HTTPException(status_code=400, detail="Invalid image type")
+
+#         animal = (
+#             await db.execute(
+#                 select(Tracking_Animal).filter(
+#                     Tracking_Animal.id == animal_id,
+#                     Tracking_Animal.created_by == str(current_user.unique_id),
+#                 )
+#             )
+#         ).scalar_one_or_none()
+#         if not animal:
+#             raise HTTPException(status_code=404, detail="Animal not found")
+
+#         result = await upload_file(file)
+#         animal.image_url = result["secure_url"]
+#         await db.commit()
+#         await db.refresh(animal)
+#         return {"message": "Image uploaded successfully", "image_url": result["secure_url"]}
+
+#     except Exception as e:
+#         await db.rollback()
+#         raise HTTPException(status_code=500, detail=f"Could not upload file: {str(e)}")
 
 
 # if __name__ == "__main__":

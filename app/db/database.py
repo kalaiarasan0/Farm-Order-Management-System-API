@@ -1,17 +1,17 @@
-import ssl as ssl_module
+# import ssl as ssl_module
 from typing import Generator
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from app.config import settings
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from app.db.base import Base, UserBase, AsyncBase
-from pathlib import Path
+# from pathlib import Path
 
-BASE_DIR = Path(__file__).resolve().parent
-SSL_CERT_PATH = BASE_DIR / "certs" / "ca.pem"
+# BASE_DIR = Path(__file__).resolve().parent
+# SSL_CERT_PATH = BASE_DIR / "certs" / "ca.pem"
 
 # Create a proper SSLContext for async engines (aiomysql requires SSLContext, not dict)
-ssl_ctx = ssl_module.create_default_context(cafile=str(SSL_CERT_PATH))
+# ssl_ctx = ssl_module.create_default_context(cafile=str(SSL_CERT_PATH))
 
 # Create a synchronous SQLAlchemy engine using the project's DATABASE_URL.
 
@@ -19,9 +19,9 @@ engine = create_engine(
     settings.DATABASE_URL,
     pool_pre_ping=True,
     future=True,
-    connect_args={
-        "ssl": {"ca": str(SSL_CERT_PATH)},
-    },
+    # connect_args={
+    #     "ssl": {"ca": str(SSL_CERT_PATH)},
+    # },
     echo=False,
 )
 async_engine = create_async_engine(
@@ -31,18 +31,18 @@ async_engine = create_async_engine(
     pool_recycle=3600,
     pool_pre_ping=True,
     future=True,
-    connect_args={
-        "ssl": ssl_ctx,
-    },
+    # connect_args={
+    #     "ssl": ssl_ctx,
+    # },
     echo=False,
 )
 user_engine = create_engine(
     settings.USER_DATABASE_URL,
     pool_pre_ping=True,
     future=True,
-    connect_args={
-        "ssl": {"ca": str(SSL_CERT_PATH)},
-    },
+    # connect_args={
+    #     "ssl": {"ca": str(SSL_CERT_PATH)},
+    # },
     echo=False,
 )
 async_user_engine = create_async_engine(
@@ -52,9 +52,9 @@ async_user_engine = create_async_engine(
     pool_recycle=3600,
     pool_pre_ping=True,
     future=True,
-    connect_args={
-        "ssl": ssl_ctx,
-    },
+    # connect_args={
+    #     "ssl": ssl_ctx,
+    # },
     echo=False,
 )
 
