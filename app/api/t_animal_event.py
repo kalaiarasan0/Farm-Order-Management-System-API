@@ -9,9 +9,11 @@ from app.schemas.t_animal_event import (
     UpdateEventNotes,
     AnimalEventListResponse,
     EventCreateSuccessResponse,
+    CreateBulkMilkCollection,
 )
 from app.services.t_animal_event import (
     create_event,
+    create_bulk_milk_collection,
     update_event_all,
     update_event_notes,
     list_events,
@@ -38,6 +40,20 @@ async def create_event_endpoint(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     return EventCreateSuccessResponse(message="Event created successfully")
+
+
+@router.post("/create/bulk_milk", response_model=EventCreateSuccessResponse)
+async def create_bulk_milk_collection_endpoint(
+    payload: CreateBulkMilkCollection,
+    db: AsyncSession = Depends(get_async_db),
+    current_user=Depends(get_current_active_user),
+):
+    """Create a bulk milk collection distributed amongst multiple animals"""
+    try:
+        await create_bulk_milk_collection(db, payload.dict(), current_user)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    return EventCreateSuccessResponse(message="Bulk milk collection created successfully")
 
 
 @router.patch("/update/{event_id}", response_model=AnimalEventResponse)
