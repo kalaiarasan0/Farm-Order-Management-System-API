@@ -43,7 +43,8 @@ Thumbs.db
 # Ignore Alembic migration files
 alembic/versions/*
 !alembic/versions/__init__.py
-
+track_sample.py
+walkthrough.md
 # Ignore Python cache
 __pycache__/
 .pytest_cache/

@@ -2,7 +2,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from typing import List, Optional
 from sqlalchemy.exc import SQLAlchemyError
-from app.models.tables import Animal as Main_Animal, AnimalEvent, MilkCollection
+import re
+from datetime import datetime
+from app.models.tables import Animal as Main_Animal, AnimalEvent, MilkCollection, Tracking_Animal
 from fastapi import HTTPException
 from sqlalchemy import select, func
 from app.schemas.users import User
@@ -59,6 +61,103 @@ async def create_event(db: AsyncSession, data: dict, current_user: User) -> Anim
             await db.commit()
             await db.refresh(event)
             return event
+    except SQLAlchemyError:
+        await db.rollback()
+        raise
+
+
+async def create_bulk_milk_collection(db: AsyncSession, data: dict, current_user: User) -> List[MilkCollection]:
+    try:
+        animals_portions = data.get("animals", [])
+        if not animals_portions:
+            raise ValueError("No animals provided for bulk collection")
+
+        sms_note = data.get("sms_note", "")
+        if not sms_note:
+            raise ValueError("sms_note is required")
+
+        # Example SMS: "NAME-511/0463/0014 2026-03-13/E Qty(Ltrs):7.50 Fat%:3.60 Snf%:7.90 Rate:36.70/Lt Amt:Rs.275.25 MilkyMist"
+        
+        # Parse logic
+        try:
+            # Date and Session: "2026-03-13/E"
+            date_session_match = re.search(r"(\d{4}-\d{2}-\d{2})/([ME])", sms_note)
+            event_date = datetime.strptime(date_session_match.group(1), "%Y-%m-%d").date() if date_session_match else None
+            event_milk_session = date_session_match.group(2) if date_session_match else None
+            if not event_date:
+                raise ValueError("Could not parse date from sms_note")
+
+            # Qty(Ltrs):7.50
+            qty_match = re.search(r"Qty\(Ltrs\):([\d.]+)", sms_note)
+            total_quantity = float(qty_match.group(1)) if qty_match else 0.0
+
+            # Fat%:3.60
+            fat_match = re.search(r"Fat%:([\d.]+)", sms_note)
+            event_milk_fat = float(fat_match.group(1)) if fat_match else None
+
+            # Snf%:7.90
+            snf_match = re.search(r"Snf%:([\d.]+)", sms_note)
+            event_milk_snf = float(snf_match.group(1)) if snf_match else None
+
+            # Rate:36.70/Lt
+            rate_match = re.search(r"Rate:([\d.]+)/Lt", sms_note)
+            event_milk_rate = float(rate_match.group(1)) if rate_match else 0.0
+            
+            event_milk_time = None
+            event_milk_water = None
+            notes = sms_note
+            
+        except Exception as e:
+            raise ValueError(f"Failed to parse sms_note: {str(e)}")
+
+        # Fetch animals by tag_ids
+        tag_ids = [ap["tag_id"] for ap in animals_portions]
+        result = await db.execute(
+            select(Tracking_Animal).filter(Tracking_Animal.tag_id.in_(tag_ids))
+        )
+        animals_db = result.scalars().all()
+        tag_id_to_animal_id = {animal.tag_id: animal.id for animal in animals_db}
+
+        missing_tags = set(tag_ids) - set(tag_id_to_animal_id.keys())
+        if missing_tags:
+            raise ValueError(f"Animals not found for tag_ids: {', '.join(missing_tags)}")
+
+        milk_events = []
+        for ap in animals_portions:
+            tag_id = ap["tag_id"]
+            percentage = ap["percentage"]
+            animal_id = tag_id_to_animal_id[tag_id]
+
+            # Separate milk quantity and amount for this animal
+            animal_qty = (total_quantity * percentage) / 100.0
+            total_price = animal_qty * event_milk_rate
+
+            if event_milk_session == "E":
+                event_milk_session = "PM"
+                event_milk_time = "18:00"
+            elif event_milk_session == "M":
+                event_milk_session = "AM"
+                event_milk_time = "06:00"
+
+            milk_event = MilkCollection(
+                animal_id=animal_id,
+                collection_date=event_date,
+                collection_time=event_milk_time,
+                quantity=animal_qty,
+                milk_snf=event_milk_snf,
+                milk_fat=event_milk_fat,
+                milk_water=event_milk_water,
+                milk_session=event_milk_session,
+                rate=event_milk_rate,
+                total_price=total_price,
+                notes=notes,
+                created_by=str(current_user.unique_id),
+            )
+            milk_events.append(milk_event)
+            db.add(milk_event)
+
+        await db.commit()
+        return milk_events
     except SQLAlchemyError:
         await db.rollback()
         raise

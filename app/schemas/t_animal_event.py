@@ -96,3 +96,13 @@ class UpdateAnimalEvent(BaseModel):
 
 class UpdateEventNotes(BaseModel):
     notes: str
+
+
+class AnimalMilkPortion(BaseModel):
+    tag_id: str
+    percentage: float # 0 to 100
+
+
+class CreateBulkMilkCollection(BaseModel):
+    sms_note: str
+    animals: List[AnimalMilkPortion]
